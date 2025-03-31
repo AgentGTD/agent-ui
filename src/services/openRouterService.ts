@@ -1,57 +1,64 @@
 import { CreateTaskParams } from '../types/task';
-import OpenAI from 'openai';
 
 const OPENROUTER_API_KEY = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY;
+const OPENROUTER_MODEL = process.env.EXPO_PUBLIC_OPENROUTER_MODEL || 'google/gemini-2.5-pro-exp-03-25:free';
 
 if (!OPENROUTER_API_KEY) {
   throw new Error('EXPO_PUBLIC_OPENROUTER_API_KEY is not set in environment variables');
 }
 
-const openai = new OpenAI({
-  baseURL: 'https://openrouter.ai/api/v1',
-  apiKey: OPENROUTER_API_KEY,
-  defaultHeaders: {
-    'HTTP-Referer': 'http://localhost:3000',
-    'X-Title': 'Task Manager App'
-  }
-});
-
 export const openRouterService = {
   async breakDownGoal(goal: string): Promise<CreateTaskParams[]> {
     try {
-      const completion = await openai.chat.completions.create({
-        model: 'openai/gpt-4',
-        messages: [
-          {
-            role: 'system',
-            content: `You are a task breakdown assistant. Break down the given goal into actionable tasks.
-              Return the tasks as a JSON array of objects, where each object has:
-              - title: string (task title)
-              - description: string (task description)
-              - priority: number (1-5, where 1 is highest)
-              - estimated_duration: number (in minutes)
-              - dependencies: string[] (array of task titles this task depends on)
-              Example format:
-              [
-                {
-                  "title": "Research project requirements",
-                  "description": "Gather and analyze project requirements from stakeholders",
-                  "priority": 1,
-                  "estimated_duration": 120,
-                  "dependencies": []
-                }
-              ]`
-          },
-          {
-            role: 'user',
-            content: `Break down this goal into actionable tasks: ${goal}`
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 1000
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'http://localhost:3000',
+          'X-Title': 'Task Manager App'
+        },
+        body: JSON.stringify({
+          model: OPENROUTER_MODEL,
+          messages: [
+            {
+              role: 'system',
+              content: `You are a task breakdown assistant. Break down the given goal into actionable tasks.
+                Return the tasks as a JSON array of objects, where each object has:
+                - title: string (task title)
+                - description: string (task description)
+                - priority: number (1-5, where 1 is highest)
+                - estimated_duration: number (in minutes)
+                - dependencies: string[] (array of task titles this task depends on)
+                Example format:
+                [
+                  {
+                    "title": "Research project requirements",
+                    "description": "Gather and analyze project requirements from stakeholders",
+                    "priority": 1,
+                    "estimated_duration": 120,
+                    "dependencies": []
+                  }
+                ]`
+            },
+            {
+              role: 'user',
+              content: `Break down this goal into actionable tasks: ${goal}`
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 1000
+        })
       });
 
-      const content = completion.choices[0]?.message?.content;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`OpenRouter API error: ${response.status} ${response.statusText} ${JSON.stringify(errorData)}`);
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+      
       if (!content) {
         throw new Error('No content in API response');
       }
