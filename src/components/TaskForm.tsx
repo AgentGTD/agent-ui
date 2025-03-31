@@ -1,85 +1,87 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { TextInput, Button, SegmentedButtons } from 'react-native-paper';
-import { CreateTaskParams, UpdateTaskParams, Task } from '../types/task';
+import { TextInput, Button, HelperText } from 'react-native-paper';
+import { useForm, Controller, SubmitHandler } from 'react-hook-form';
+import { Task, CreateTaskParams, UpdateTaskParams } from '../types/task';
 
-interface TaskFormProps {
-  initialValues?: Task;
-  onSubmit: (values: CreateTaskParams | UpdateTaskParams) => Promise<void>;
+type FormValues = CreateTaskParams;
+
+interface BaseTaskFormProps {
   onCancel: () => void;
 }
 
-export const TaskForm = ({ initialValues, onSubmit, onCancel }: TaskFormProps) => {
-  const [title, setTitle] = useState(initialValues?.title || '');
-  const [description, setDescription] = useState(initialValues?.description || '');
-  const [status, setStatus] = useState<Task['status']>(initialValues?.status || 'pending');
-  const [loading, setLoading] = useState(false);
+interface CreateTaskFormProps extends BaseTaskFormProps {
+  task?: null;
+  onSubmit: (values: CreateTaskParams) => Promise<void>;
+}
 
-  const handleSubmit = async () => {
-    if (!title.trim() || !description.trim()) {
-      return;
-    }
+interface UpdateTaskFormProps extends BaseTaskFormProps {
+  task: Task;
+  onSubmit: (id: string, values: UpdateTaskParams) => Promise<void>;
+}
 
-    setLoading(true);
-    try {
-      await onSubmit({
-        title: title.trim(),
-        description: description.trim(),
-        status,
-      });
-      onCancel();
-    } catch (error) {
-      console.error('Failed to submit task:', error);
-    } finally {
-      setLoading(false);
+type TaskFormProps = CreateTaskFormProps | UpdateTaskFormProps;
+
+export const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
+  const { control, handleSubmit, formState: { errors } } = useForm<FormValues>({
+    defaultValues: {
+      title: task?.title || '',
+      description: task?.description || '',
+      status: task?.status || 'pending',
+    },
+  });
+
+  const handleFormSubmit: SubmitHandler<FormValues> = async (values) => {
+    if (task) {
+      await (onSubmit as (id: string, values: UpdateTaskParams) => Promise<void>)(task.id, values);
+    } else {
+      await (onSubmit as (values: CreateTaskParams) => Promise<void>)(values);
     }
   };
 
   return (
     <View style={styles.container}>
-      <TextInput
-        label="Title"
-        value={title}
-        onChangeText={setTitle}
-        style={styles.input}
-        mode="outlined"
+      <Controller
+        control={control}
+        name="title"
+        rules={{ required: 'Title is required' }}
+        render={({ field: { onChange, value } }: { field: { onChange: (value: string) => void; value: string } }) => (
+          <>
+            <TextInput
+              label="Title"
+              value={value}
+              onChangeText={onChange}
+              error={!!errors.title}
+              style={styles.input}
+            />
+            {errors.title && (
+              <HelperText type="error">{errors.title.message}</HelperText>
+            )}
+          </>
+        )}
       />
-      <TextInput
-        label="Description"
-        value={description}
-        onChangeText={setDescription}
-        style={styles.input}
-        mode="outlined"
-        multiline
-        numberOfLines={3}
+
+      <Controller
+        control={control}
+        name="description"
+        render={({ field: { onChange, value } }: { field: { onChange: (value: string) => void; value: string } }) => (
+          <TextInput
+            label="Description"
+            value={value}
+            onChangeText={onChange}
+            multiline
+            numberOfLines={3}
+            style={styles.input}
+          />
+        )}
       />
-      <SegmentedButtons
-        value={status}
-        onValueChange={value => setStatus(value as Task['status'])}
-        buttons={[
-          { value: 'pending', label: 'Pending' },
-          { value: 'in_progress', label: 'In Progress' },
-          { value: 'completed', label: 'Completed' },
-        ]}
-        style={styles.segmentedButtons}
-      />
-      <View style={styles.buttonContainer}>
-        <Button
-          mode="outlined"
-          onPress={onCancel}
-          style={styles.button}
-          disabled={loading}
-        >
+
+      <View style={styles.buttons}>
+        <Button mode="outlined" onPress={onCancel} style={styles.button}>
           Cancel
         </Button>
-        <Button
-          mode="contained"
-          onPress={handleSubmit}
-          style={styles.button}
-          loading={loading}
-          disabled={loading || !title.trim() || !description.trim()}
-        >
-          {initialValues ? 'Update' : 'Create'} Task
+        <Button mode="contained" onPress={handleSubmit(handleFormSubmit)} style={styles.button}>
+          {task ? 'Update' : 'Create'}
         </Button>
       </View>
     </View>
@@ -93,12 +95,10 @@ const styles = StyleSheet.create({
   input: {
     marginBottom: 16,
   },
-  segmentedButtons: {
-    marginBottom: 16,
-  },
-  buttonContainer: {
+  buttons: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    marginTop: 16,
   },
   button: {
     marginLeft: 8,

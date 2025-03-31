@@ -1,6 +1,10 @@
 import { Task, CreateTaskParams, UpdateTaskParams } from '../types/task';
 
-const API_BASE_URL = 'http://localhost:4000'; // Update this with your actual API URL
+const API_BASE_URL = process.env.EXPO_PUBLIC_TASK_API_BASE_URL;
+
+if (!API_BASE_URL) {
+  throw new Error('EXPO_PUBLIC_TASK_API_BASE_URL is not set in environment variables');
+}
 
 export const taskService = {
   async listTasks(): Promise<Task[]> {

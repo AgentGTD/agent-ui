@@ -3,6 +3,7 @@ import { View, FlatList, StyleSheet } from 'react-native';
 import { Card, Title, Paragraph, Button, IconButton, useTheme } from 'react-native-paper';
 import { Task } from '../types/task';
 import { taskService } from '../services/taskService';
+import { addEventListener } from '../utils/eventEmitter';
 
 interface TaskListProps {
   onEditTask: (task: Task) => void;
@@ -15,6 +16,15 @@ export const TaskList = ({ onEditTask }: TaskListProps) => {
 
   useEffect(() => {
     loadTasks();
+
+    // Listen for tasksUpdated event
+    const subscription = addEventListener('tasksUpdated', () => {
+      loadTasks();
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   const loadTasks = async () => {

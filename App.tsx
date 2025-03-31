@@ -4,28 +4,36 @@ import { Provider as PaperProvider, Portal, Modal, FAB } from 'react-native-pape
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { TaskList } from './src/components/TaskList';
 import { TaskForm } from './src/components/TaskForm';
+import { GoalInput } from './src/components/GoalInput';
+import { Task, CreateTaskParams, UpdateTaskParams } from './src/types/task';
 import { taskService } from './src/services/taskService';
-import { Task } from './src/types/task';
+import { emitEvent } from './src/utils/eventEmitter';
 
 export default function App() {
-  const [isFormVisible, setIsFormVisible] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<Task | undefined>();
+  const [visible, setVisible] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
-  const handleCreateTask = async (values: any) => {
+  const showModal = () => setVisible(true);
+  const hideModal = () => {
+    setVisible(false);
+    setSelectedTask(null);
+  };
+
+  const handleCreateTask = async (params: CreateTaskParams) => {
     try {
-      await taskService.createTask(values);
-      setIsFormVisible(false);
+      await taskService.createTask(params);
+      hideModal();
+      emitEvent('tasksUpdated');
     } catch (error) {
       console.error('Failed to create task:', error);
     }
   };
 
-  const handleUpdateTask = async (values: any) => {
-    if (!selectedTask) return;
+  const handleUpdateTask = async (id: string, params: UpdateTaskParams) => {
     try {
-      await taskService.updateTask(selectedTask.id, values);
-      setIsFormVisible(false);
-      setSelectedTask(undefined);
+      await taskService.updateTask(id, params);
+      hideModal();
+      emitEvent('tasksUpdated');
     } catch (error) {
       console.error('Failed to update task:', error);
     }
@@ -33,12 +41,11 @@ export default function App() {
 
   const handleEditTask = (task: Task) => {
     setSelectedTask(task);
-    setIsFormVisible(true);
+    showModal();
   };
 
-  const handleCloseForm = () => {
-    setIsFormVisible(false);
-    setSelectedTask(undefined);
+  const handleTasksCreated = () => {
+    emitEvent('tasksUpdated');
   };
 
   return (
@@ -48,22 +55,23 @@ export default function App() {
           <TaskList onEditTask={handleEditTask} />
           <Portal>
             <Modal
-              visible={isFormVisible}
-              onDismiss={handleCloseForm}
-              contentContainerStyle={styles.modalContent}
+              visible={visible}
+              onDismiss={hideModal}
+              contentContainerStyle={styles.modal}
             >
               <TaskForm
-                initialValues={selectedTask}
+                task={selectedTask}
                 onSubmit={selectedTask ? handleUpdateTask : handleCreateTask}
-                onCancel={handleCloseForm}
+                onCancel={hideModal}
               />
             </Modal>
           </Portal>
           <FAB
             icon="plus"
             style={styles.fab}
-            onPress={() => setIsFormVisible(true)}
+            onPress={showModal}
           />
+          <GoalInput onTasksCreated={handleTasksCreated} />
         </View>
       </PaperProvider>
     </SafeAreaProvider>
@@ -75,8 +83,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-  modalContent: {
+  modal: {
     backgroundColor: 'white',
+    padding: 20,
     margin: 20,
     borderRadius: 8,
   },
@@ -84,6 +93,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     margin: 16,
     right: 0,
-    bottom: 0,
+    bottom: 80, // Moved up to make room for GoalInput
   },
 });
