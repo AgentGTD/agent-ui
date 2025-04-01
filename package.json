@@ -9,7 +9,10 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@expo/vector-icons": "^14.0.4",
     "@openrouter/ai-sdk-provider": "^0.4.5",
+    "@react-navigation/bottom-tabs": "^7.3.4",
+    "@react-navigation/native": "^7.1.0",
     "ai": "^4.2.9",
     "expo": "~52.0.42",
     "expo-status-bar": "~2.0.1",
